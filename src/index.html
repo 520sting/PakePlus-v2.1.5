@@ -1,32 +1,571 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>25计算机应用 - 随机座位</title>
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
-            <form class="row" id="greet-form">
-                <input id="inputValue" placeholder="Enter a something..." />
-            </form>
-            <div class="resultBox">
-                <span>result: </span>
-                <span id="result"></span>
-            </div>
-            <div class="invokeBox">
-                <button id="openUrl">open_url_browser</button>
-                <button id="openUrlNew">open_url_new</button>
-                <button id="runCommand">run_command</button>
-                <button id="downloadFile">download_file</button>
-                <button id="getExeDir">get_exe_dir</button>
-                <button id="getEnvVar">get_env_var</button>
-                <button id="findPort">find_port</button>
-            </div>
-        </main>
-    </body>
+<style>
+  /* --- 核心变量系统 (支持一键换肤) --- */
+  :root {
+    /* 默认主题 (Origin) */
+    --primary: #007AFF;
+    --bg-grad: linear-gradient(125deg, #f0f9ff 0%, #e0f2fe 40%, #fdfcfb 70%, #e0e7ff 100%);
+    --glass: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.8);
+    --text-main: #1d1d1f;
+    --text-sub: #555;
+    --island-bg: rgba(0, 0, 0, 0.92);
+    --island-text: #fff;
+    --card-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  }
+
+  /* 赛博朋克主题 */
+  [data-theme="cyber"] {
+    --primary: #00ff41;
+    --bg-grad: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
+    --glass: rgba(0, 0, 0, 0.7);
+    --glass-border: #00ff41;
+    --text-main: #e0e0e0;
+    --text-sub: #00ff41;
+    --island-bg: #003300;
+    --island-text: #00ff41;
+    --card-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+  }
+
+  /* 复古纸张主题 */
+  [data-theme="retro"] {
+    --primary: #8b4513;
+    --bg-grad: linear-gradient(125deg, #fdfbf7 0%, #f3e5d8 100%);
+    --glass: rgba(243, 229, 216, 0.8);
+    --glass-border: #8b4513;
+    --text-main: #3e2723;
+    --text-sub: #5d4037;
+    --island-bg: #3e2723;
+    --island-text: #fdfbf7;
+    --card-shadow: 0 10px 20px rgba(62, 39, 35, 0.1);
+  }
+
+  body { 
+    font-family: -apple-system, "SF Pro Display", "PingFang SC", sans-serif; 
+    margin: 0; padding: 0; min-height: 100vh;
+    background: var(--bg-grad); background-size: 400% 400%; animation: gradientFlow 15s ease infinite;
+    color: var(--text-main); transition: background 0.5s, color 0.5s;
+  }
+  @keyframes gradientFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+  /* --- 灵动岛 --- */
+  .island {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(20px);
+    color: white; border-radius: 30px; display: flex; align-items: center; justify-content: center;
+    z-index: 10000; transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 200px; height: 44px; border: 0.5px solid rgba(255,255,255,0.2); overflow: hidden; cursor: pointer;
+  }
+  .island:hover { transform: translateX(-50%) scale(1.02); }
+  .island.active { width: 440px; height: 180px; border-radius: 50px; background: var(--island-bg); color: var(--island-text); cursor: default; }
+  .island.menu-open { width: 420px; height: 80px; border-radius: 40px; background: var(--island-bg); color: var(--island-text); }
+  .island-content { width: 90%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  
+  .island-menu-box { display: none; width: 100%; height: 100%; align-items: center; justify-content: space-around; opacity: 0; transition: opacity 0.3s; }
+  .island.menu-open .island-menu-box { display: flex; opacity: 1; }
+  .island.menu-open .default-label { display: none; }
+  
+  .menu-btn { background: rgba(255,255,255,0.15); border: none; color: inherit; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+  .menu-btn:hover { background: var(--primary); color: white; transform: scale(1.1); }
+
+  #nameFlicker { font-size: 48px; font-weight: 900; color: var(--primary); text-shadow: 0 0 25px var(--primary); margin: 10px 0; }
+  .island-stats { display: flex; justify-content: space-between; width: 100%; font-size: 13px; font-weight: 600; opacity: 0.8; }
+  .island-pg-box { width: 100%; height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; margin-top: 15px; overflow: hidden; box-shadow: 0 0 10px rgba(0,123,255,0.3); }
+  .island-pg-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.2s ease; box-shadow: 0 0 15px var(--primary); }
+
+  /* --- 管理员面板 (Admin Dashboard) --- */
+  #adminPage {
+    position: fixed; inset: 0; z-index: 30000; background: rgba(0,0,0,0.6); backdrop-filter: blur(15px);
+    display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;
+  }
+  #adminPage.show { opacity: 1; }
+  
+  .admin-panel {
+    width: 600px; height: 70vh; background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 30px; padding: 30px; display: flex; flex-direction: column;
+    box-shadow: 0 50px 100px rgba(0,0,0,0.3); color: var(--text-main);
+  }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid rgba(0,0,0,0.05); padding-bottom: 10px; }
+  
+  .settings-section { margin-bottom: 25px; }
+  .settings-title { font-size: 14px; font-weight: 800; color: var(--text-sub); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  
+  /* 滑动条样式 */
+  input[type=range] { width: 100%; accent-color: var(--primary); margin: 10px 0; }
+  
+  /* 主题切换卡片 */
+  .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+  .theme-card { 
+    height: 80px; border-radius: 15px; cursor: pointer; border: 2px solid transparent; 
+    display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;
+    transition: 0.3s; position: relative; overflow: hidden;
+  }
+  .theme-card:hover { transform: translateY(-5px); }
+  .theme-card.active { border-color: var(--primary); transform: scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+  
+  /* 历史记录 */
+  .history-list { flex: 1; overflow-y: auto; background: rgba(255,255,255,0.3); border-radius: 15px; padding: 10px; }
+  .history-item { 
+    display: flex; justify-content: space-between; padding: 12px; 
+    border-bottom: 1px solid rgba(0,0,0,0.05); cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .history-item:hover { background: rgba(255,255,255,0.5); }
+
+  /* --- 主界面元素 --- */
+  .groups-container { max-width: 1450px; margin: 0 auto; padding: 0 20px 150px; }
+  .groups-wrapper { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
+  .group-card { background: var(--glass); backdrop-filter: blur(20px); border-radius: 35px; padding: 20px; border: 1px solid var(--glass-border); box-shadow: var(--card-shadow); transition: 0.3s; }
+  .group-header { font-size: 14px; font-weight: 900; color: var(--primary); margin-bottom: 15px; text-align: center; }
+  
+  .person { 
+    flex: 1; padding: 18px 2px; background: rgba(255,255,255,0.8); border-radius: 16px; 
+    font-size: 16px; font-weight: 800; text-align: center; cursor: pointer; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); 
+    color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  }
+  .person:hover {
+    transform: translateY(-8px) scale(1.08);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    z-index: 5;
+  }
+  .person:active {
+    transform: translateY(0) scale(1.03);
+  }
+  .person.selected { background: var(--primary) !important; color: white !important; transform: scale(1.1); z-index: 10; }
+
+  /* 动态模糊动画 - 增强模糊效果 + 延长基础时间 */
+  @keyframes sequentialBlurIn {
+    0% { opacity: 0; filter: blur(40px); transform: scale(0.7) translateY(40px); }
+    100% { opacity: 1; filter: blur(0px); transform: scale(1) translateY(0); }
+  }
+  .seq-blur { opacity: 0; animation-name: sequentialBlurIn; animation-fill-mode: forwards; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+  /* 底部栏 */
+  .bottom-bar { 
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
+    background: var(--glass); backdrop-filter: blur(20px); 
+    padding: 15px 40px; border-radius: 25px; border: 1px solid var(--glass-border); 
+    display: flex; gap: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); 
+    z-index: 9000; transition: 0.3s;
+  }
+  .bottom-bar.scrolled { opacity: 0.3; } .bottom-bar:hover { opacity: 1; }
+  
+  .ios-btn { background: var(--primary); color: white; border: none; padding: 15px 35px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; }
+  .ios-btn.secondary { background: #e5e5ea; color: #1c1c1e; }
+  
+  /* 方位指示 - 加强讲台3D效果 */
+  .center-dashboard { display: flex; flex-direction: column; align-items: center; margin-top: 100px; margin-bottom: 40px; gap: 20px; }
+  .orientation-row { display: flex; align-items: center; gap: 40px; }
+  .side-box { 
+    width: 140px; height: 50px; border-radius: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+    font-size: 13px; font-weight: 800; border: 1px solid var(--glass-border); background: var(--glass); 
+    color: var(--text-sub); transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer;
+  }
+  .side-box:hover, .side-box:active {
+    transform: translateY(-10px) scale(1.1);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+  }
+  .side-box:active {
+    transform: translateY(0) scale(1.05);
+  }
+  .side-label { font-size: 10px; opacity: 0.8; }
+  
+  .podium { 
+    width: 420px; height: 80px; background: var(--glass); 
+    border-radius: 20px 20px 80px 80px; border: 1px solid var(--glass-border); 
+    display: flex; align-items: center; justify-content: center; 
+    transform: perspective(800px) rotateX(20deg); 
+    font-size: 22px; font-weight: 900; letter-spacing: 3px; color: var(--text-main);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.2), inset 0 10px 20px rgba(255,255,255,0.4);
+    backdrop-filter: blur(10px);
+  }
+
+  /* 预览与导入 */
+  #previewPage { position: fixed; inset: 0; z-index: 20000; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.8); backdrop-filter: blur(60px); transition: 0.8s; }
+  #previewPage.hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  .list-container { width: 60%; height: 40vh; overflow-y: auto; background: white; border-radius: 20px; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin: 30px 0; }
+  .list-item { font-size: 13px; font-weight: 600; color: #555; padding: 5px; text-align: center; background: #f5f5f7; border-radius: 6px; }
+
+  /* 导入框 */
+  textarea { width: 100%; height: 200px; border: 2px solid #eee; border-radius: 15px; padding: 15px; font-size: 16px; margin: 20px 0; box-sizing: border-box; resize: none; outline: none; }
+  
+  /* 历史查看弹窗 */
+  #historyModal { position: fixed; inset: 0; z-index: 35000; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+  .history-box { width: 80%; height: 80%; background: white; border-radius: 20px; padding: 20px; overflow: auto; }
+</style>
+</head>
+<body>
+
+<div id="island" class="island" onclick="toggleIslandMenu(event)">
+  <div class="island-content" id="islandInner">
+    <span id="islandLabel" class="default-label" style="font-size:14px; font-weight:800;">STING V13.0</span>
+    
+    <div class="island-menu-box" id="islandMenu">
+        <button class="menu-btn" onclick="startLottery(event)">🎲 重抽</button>
+        <button class="menu-btn" onclick="exportTable(event)">📑 导出</button>
+        <button class="menu-btn" onclick="openAdmin(event)">⚙️ 管理</button>
+        <button class="menu-btn" onclick="closeIslandMenu(event)">❌ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminPage">
+  <div class="admin-panel">
+    <div class="admin-header">
+      <h2 style="margin:0;">⚙️ Sting 控制台</h2>
+      <button class="ios-btn secondary" style="padding:8px 20px;" onclick="closeAdmin()">关闭</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-title">UI 宇宙 (Themes)</div>
+      <div class="theme-grid">
+        <div class="theme-card active" onclick="setTheme('origin', this)" style="background: linear-gradient(135deg, #007AFF, #00c6ff);">Origin</div>
+        <div class="theme-card" onclick="setTheme('cyber', this)" style="background: linear-gradient(135deg, #000, #00ff41);">Cyber</div>
+        <div class="theme-card" onclick="setTheme('retro', this)" style="background: linear-gradient(135deg, #8b4513, #d7ccc8);">Retro</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-title">时空控制 (Speed Control)</div>
+      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+        <span>抽签过程时长: <span id="scanVal">10</span>s</span>
+      </div>
+      <input type="range" min="3" max="20" value="10" oninput="updateConfig('scan', this.value)">
+      
+      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; margin-top:10px;">
+        <span>名单模糊导入速度: <span id="blurVal">0.8</span>s</span>
+      </div>
+      <input type="range" min="0.1" max="2.0" step="0.1" value="0.8" oninput="updateConfig('blur', this.value)">
+    </div>
+
+    <div class="settings-title">历史档案 (History)</div>
+    <div class="history-list" id="historyLogList">
+      <div style="text-align:center; color:#999; padding:20px;">暂无抽签记录</div>
+    </div>
+  </div>
+</div>
+
+<div id="historyModal">
+  <div class="history-box">
+    <h3>📜 历史座位表存档</h3>
+    <button class="ios-btn secondary" onclick="document.getElementById('historyModal').style.display='none'">关闭</button>
+    <div id="historyContent" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+<div id="previewPage">
+  <h1 style="font-size:36px; margin-bottom:10px;">25计算机应用</h1>
+  <div class="list-container" id="previewContainer"></div>
+  <div class="entry-actions" style="display:flex; gap:20px;">
+    <button class="ios-btn secondary" onclick="openImport()">📑 导入名单</button>
+    <button class="ios-btn" onclick="document.getElementById('previewPage').classList.add('hidden')">进入系统</button>
+  </div>
+</div>
+
+<div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:25000; align-items:center; justify-content:center;">
+  <div style="background:white; padding:30px; border-radius:20px; width:500px;">
+    <h2>导入名单</h2>
+    <textarea id="importInput"></textarea>
+    <div style="text-align:right; gap:10px; display:flex; justify-content:flex-end;">
+      <button class="ios-btn secondary" onclick="document.getElementById('importModal').style.display='none'">取消</button>
+      <button class="ios-btn" onclick="saveNewList()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="center-dashboard">
+    <div class="orientation-row">
+        <div class="side-box">
+          🪟 靠窗<br><span class="side-label">第1组</span>
+        </div>
+        <div class="podium">讲台</div>
+        <div class="side-box">
+          🚪 靠门<br><span class="side-label">第5组</span>
+        </div>
+    </div>
+</div>
+
+<div class="groups-container">
+    <div id="groups" class="groups-wrapper"></div>
+</div>
+
+<div class="bottom-bar" id="controlBar">
+    <button class="ios-btn" onclick="startLottery(event)">随机抽签</button>
+    <button class="ios-btn secondary" onclick="clearSelection()">撤销选择</button>
+    <button class="ios-btn" style="background:#34c759;" onclick="exportTable(event)">导出表格</button>
+</div>
+
+<script>
+// --- 全局配置 & 数据 ---
+let config = {
+  scanDuration: 10000, // 默认10秒（管理员可调）
+  blurSpeed: 0.8,      // 默认0.8秒
+  homingDuration: 6000 // 新增：归位动画固定6秒
+};
+let currentNames = ["蔡嘉汝","蔡栩逸","陈如意","陈韵骐","陈子源","杜晓文","樊广业","高浩延","高嘉豪","郭焕胜","何如炜","何晓宇","何钰荧","黄思源","黄泳菲","赖燕菲","黎智锋","李杰朝","李少琼","李文君","李姿霖","梁珀睿","梁咏怡","廖炜杰","刘晓俊","陆澄澄","陆嘉健","罗嘉怡","罗立鑫","欧世煌","沈载淳","苏泳岚","覃诗韵","谭智轩","王永升","韦冠辰","吴朗盛","吴晓慧","伍承诺","冼裕承","杨诗妍","叶嘉颖","余家怡","余锦洋","袁汉杰","钟佳焰","钟静雯","钟俊杰","钟颖欣","周欣怡"];
+let students = [];
+let groupedData = []; 
+let historyLog = []; // 存储历史记录
+let isAnimating = false;
+let selectedNode = null;
+
+// --- 初始化 ---
+function initData() {
+  students = currentNames.map((n, i) => ({ id: i + 1, name: n }));
+  renderPreview();
+  renderPlaceholders();
+}
+
+// --- 核心逻辑：抽签 ---
+function startLottery(e) {
+  if(e) e.stopPropagation();
+  if(isAnimating) return;
+  isAnimating = true;
+  
+  const island = document.getElementById('island');
+  const inner = document.getElementById('islandInner');
+  island.classList.remove('menu-open');
+  island.classList.add('active');
+  document.getElementById('islandLabel').style.display = 'block';
+
+  // 1. 数据计算 (包含固定位逻辑)
+  const allowedRows = [[0, 1], [1], [1], [], []]; 
+  const candidatePairs = [];
+  for (let g = 0; g <= 2; g++) { 
+    for (let r of allowedRows[g]) candidatePairs.push({ front: g * 5 + r, back: g * 5 + r + 1 });
+  }
+  const chosen = candidatePairs[Math.floor(Math.random() * candidatePairs.length)];
+  const s8 = students.find(s=>s.id===8), s14 = students.find(s=>s.id===14);
+  const s10 = students.find(s=>s.id===10), s49 = students.find(s=>s.id===49);
+  let useFixed = (s8 && s14 && s10 && s49);
+  let pool = useFixed ? students.filter(s => ![8,14,10,49].includes(s.id)) : [...students];
+  pool.sort(() => Math.random()-0.5);
+
+  groupedData = Array(5).fill().map(()=>Array(5).fill(null));
+  for(let i=0; i<25; i++) {
+    let g = Math.floor(i/5), d = i%5;
+    if(useFixed && i === chosen.front) groupedData[g][d] = [s14, s8];
+    else if(useFixed && i === chosen.back) groupedData[g][d] = [s10, s49];
+    else groupedData[g][d] = [pool.shift() || {name:'-'}, pool.shift() || {name:'-'}];
+  }
+
+  // 2. 扫描动画 (可调速) - 增强进度条显示
+  const startTime = Date.now();
+  const flickerNames = [...currentNames].sort(() => Math.random() - 0.5);
+  const runScan = () => {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min((elapsed / config.scanDuration) * 100, 100);
+    inner.innerHTML = `
+      <div class="island-stats">
+        <span>量子计算中...</span>
+        <span>${progress.toFixed(1)}%</span>
+      </div>
+      <div id="nameFlicker">${flickerNames[Math.floor(Date.now()/50)%currentNames.length]}</div>
+      <div class="island-pg-box">
+        <div class="island-pg-fill" style="width:${progress}%"></div>
+      </div>`;
+    
+    if (elapsed < config.scanDuration) requestAnimationFrame(runScan);
+    else startImportSequence();
+  };
+  requestAnimationFrame(runScan);
+}
+
+// 3. 归位动画 - 延长至6秒
+function startImportSequence() {
+  const inner = document.getElementById('islandInner');
+  renderDynamic(true); // 传入true激活动画
+  
+  let timeLeft = 6.0; // 固定6秒
+  const interval = setInterval(() => {
+    timeLeft -= 0.1;
+    inner.innerHTML = `<div style="font-size:18px; font-weight:600; opacity:0.6;">SYSTEM HOMING</div><div style="font-size:54px; font-weight:900; color:var(--primary);">${timeLeft.toFixed(1)}s</div><div style="font-size:12px; margin-top:10px; opacity:0.4;">正在导入座位序列...</div>`;
+    if(timeLeft <= 0) {
+      clearInterval(interval);
+      document.getElementById('island').classList.remove('active');
+      isAnimating = false;
+      setTimeout(() => inner.innerHTML = `<span id="islandLabel" style="font-size:16px; font-weight:900;">作者：Sting</span>`, 700);
+      saveToHistory(); // 记录历史
+    }
+  }, 100);
+}
+
+// --- 渲染逻辑 ---
+function renderDynamic(animate) {
+  const box = document.getElementById('groups'); box.innerHTML = '';
+  let sequenceIndex = 0;
+
+  groupedData.forEach((group, gIdx) => {
+    let h = `<div class="group-card"><div class="group-header">第 ${gIdx+1} 组</div>`;
+    group.forEach((desk, dIdx) => {
+      h += `<div style="display:flex; gap:12px; margin:15px 0;">`;
+      desk.forEach((s, pIdx) => {
+        const delay = animate ? (sequenceIndex * (config.blurSpeed / 10)).toFixed(2) : 0; 
+        const duration = config.blurSpeed + "s";
+        
+        h += `<span class="person ${animate?'seq-blur':''}" 
+              style="animation-duration:${duration}; animation-delay:${delay}s; opacity:${animate?0:1};" 
+              onclick="handleSwap(${gIdx},${dIdx},${pIdx},this)">${s.name}</span>`;
+        if(s.name !== '-') sequenceIndex++;
+      });
+      h += `</div>`;
+    });
+    box.innerHTML += h + `</div>`;
+  });
+}
+
+function handleSwap(g,d,p,el) {
+  if(isAnimating) return;
+  if (!selectedNode) { selectedNode = {g,d,p,el}; el.classList.add('selected'); }
+  else {
+    const p1 = groupedData[selectedNode.g][selectedNode.d][selectedNode.p], p2 = groupedData[g][d][p];
+    groupedData[selectedNode.g][selectedNode.d][selectedNode.p] = p2; groupedData[g][d][p] = p1;
+    selectedNode = null; renderDynamic(false);
+  }
+}
+
+// --- 管理员系统 (Admin System) ---
+
+function openAdmin(e) {
+  e.stopPropagation();
+  const pass = prompt("🔐 请输入管理员密码：");
+  if(pass === 'sting') {
+    const page = document.getElementById('adminPage');
+    page.style.display = 'flex';
+    setTimeout(() => page.classList.add('show'), 10);
+    document.getElementById('island').classList.remove('menu-open');
+    renderHistoryList();
+  } else if (pass !== null) {
+    alert("⛔️ 密码错误");
+  }
+}
+
+function closeAdmin() {
+  const page = document.getElementById('adminPage');
+  page.classList.remove('show');
+  setTimeout(() => page.style.display = 'none', 300);
+}
+
+function updateConfig(type, val) {
+  if(type === 'scan') {
+    config.scanDuration = val * 1000;
+    document.getElementById('scanVal').innerText = val;
+  }
+  if(type === 'blur') {
+    config.blurSpeed = val;
+    document.getElementById('blurVal').innerText = val;
+  }
+}
+
+function setTheme(themeName, btn) {
+  document.documentElement.setAttribute('data-theme', themeName);
+  document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// --- 历史记录系统 ---
+function saveToHistory() {
+  const snapshot = JSON.parse(JSON.stringify(groupedData));
+  const time = new Date().toLocaleString();
+  historyLog.unshift({ time, data: snapshot });
+}
+
+function renderHistoryList() {
+  const list = document.getElementById('historyLogList');
+  if(historyLog.length === 0) return;
+  list.innerHTML = historyLog.map((log, idx) => `
+    <div class="history-item" onclick="viewHistory(${idx})">
+      <span>⏱️ ${log.time}</span>
+      <span>查看详情 ></span>
+    </div>
+  `).join('');
+}
+
+function viewHistory(idx) {
+  const log = historyLog[idx];
+  const modal = document.getElementById('historyModal');
+  const content = document.getElementById('historyContent');
+  
+  let html = `<table border="1" style="width:100%; border-collapse:collapse; text-align:center;">`;
+  for(let r=0; r<5; r++){
+    html += `<tr><td style="background:#eee; font-weight:bold;">第${r+1}排</td>`;
+    for(let g=0; g<5; g++) {
+       const p1 = log.data[g][r][0].name;
+       const p2 = log.data[g][r][1].name;
+       html += `<td style="padding:8px;">${p1}</td><td style="padding:8px;">${p2}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</table>`;
+  
+  content.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+// --- 通用工具 ---
+function renderPlaceholders() {
+  const box = document.getElementById('groups'); box.innerHTML = '';
+  for(let g=1; g<=5; g++){
+    let h = `<div class="group-card"><div class="group-header">第 ${g} 组</div>`;
+    for(let r=0; r<5; r++) h += `<div style="display:flex; gap:10px; margin:12px 0;"><span class="person" style="opacity:0.1; background:#000;"></span><span class="person" style="opacity:0.1; background:#000;"></span></div>`;
+    box.innerHTML += h + `</div>`;
+  }
+}
+
+function renderPreview() {
+  document.getElementById('previewContainer').innerHTML = currentNames.map((n, i) => `<div class="list-item">${i+1}. ${n}</div>`).join('');
+}
+
+function openImport() {
+  if (prompt("密码：") === 'sting') document.getElementById('importModal').style.display='flex';
+}
+
+function saveNewList() {
+  const lines = document.getElementById('importInput').value.split(/[\n\r]+/).map(s => s.trim()).filter(s => s);
+  if(lines.length>4) { currentNames = lines; initData(); document.getElementById('importModal').style.display='none'; }
+}
+
+function toggleIslandMenu(e) {
+  if (isAnimating) return;
+  if (e.target.tagName === 'BUTTON') return;
+  document.getElementById('island').classList.toggle('menu-open');
+}
+
+function closeIslandMenu(e) {
+  e.stopPropagation();
+  document.getElementById('island').classList.remove('menu-open');
+}
+
+function exportTable(e) {
+  if(e) e.stopPropagation();
+  if (!groupedData[0]) return alert("请先抽签！");
+  let table = `<table border="1" style="border-collapse:collapse; width:100%; text-align:center;"><tr><th colspan="11">25计算机应用座位表</th></tr>`;
+  for(let r=0; r<5; r++){
+    table += `<tr><td>排${r+1}</td>`;
+    for(let g=0; g<5; g++) table += `<td>${groupedData[g][r][0].name}</td><td>${groupedData[g][r][1].name}</td>`;
+    table += `</tr>`;
+  }
+  window.open('', '_blank').document.write(table);
+}
+
+function clearSelection() {
+  if (selectedNode) {
+    selectedNode.el.classList.remove('selected');
+    selectedNode = null;
+  }
+}
+
+window.addEventListener('scroll', () => {
+  const bar = document.getElementById('controlBar');
+  if (window.scrollY > 50) bar.classList.add('scrolled');
+  else bar.classList.remove('scrolled');
+});
+
+initData();
+</script>
+</body>
 </html>
